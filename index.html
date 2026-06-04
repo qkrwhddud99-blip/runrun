@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>트리플 점프 디노 런 (Triple Jump Dino Run)</title>
+    <!-- Tailwind CSS 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter 스타일 폰트 탑재 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #090d16;
+        }
+        /* 캔버스 영역 스타일링 */
+        canvas {
+            image-rendering: pixelated;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen text-slate-100 p-4 overflow-hidden">
+
+<div class="w-full max-w-4xl flex flex-col items-center">
+    <!-- 헤더 영역 -->
+    <div class="text-center mb-4">
+        <h1 class="text-3xl md:text-5xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 drop-shadow-md">
+            TRIPLE JUMP DINO RUN
+        </h1>
+        <p class="text-xs md:text-sm text-slate-400 mt-1">
+            클릭/터치 1번 = 1단 | 2번 = 2단 | 3번 = <span class="text-cyan-400 font-extrabold animate-pulse">★3단 초강력 회전 점프★</span>
+        </p>
+    </div>
+
+    <!-- 메인 게임 영역 카드 -->
+    <div class="relative w-full bg-slate-900/90 rounded-2xl border-4 border-slate-800 overflow-hidden shadow-2xl p-2 md:p-4">
+        
+        <!-- 실시간 점수판 및 상태 표시 -->
+        <div class="flex justify-between items-center px-4 py-2 mb-2 bg-slate-950/80 rounded-xl border border-slate-800 text-sm md:text-lg font-bold">
+            <div class="flex items-center space-x-4">
+                <span class="text-emerald-400">LV.<span id="ui-level">1</span></span>
+                <span class="text-slate-550">|</span>
+                <span class="text-sky-400">SPEED: <span id="ui-speed">1.0</span>x</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span>TIME: <span id="ui-time" class="text-amber-400">0s</span></span>
+                <span class="text-slate-550">|</span>
+                <span>SCORE: <span id="ui-score" class="text-white">0</span></span>
+            </div>
+        </div>
+
+        <!-- 게임 캔버스 (반응형 랩핑) -->
+        <div class="relative w-full aspect-[16/9] bg-slate-950 rounded-lg overflow-hidden">
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+            <!-- 게임 시작 / 오버 오버레이 화면 -->
+            <div id="gameOverlay" class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-4 md:p-6 text-center transition-all duration-300 overflow-y-auto">
+                <!-- 인게임 로고 및 안내 캐릭터 -->
+                <div class="mb-2 animate-bounce text-6xl">🦕</div>
+                <h2 id="overlayTitle" class="text-2xl md:text-4xl font-black text-emerald-400 mb-2">CUTE EXPLORER DINO</h2>
+                <p id="overlayDesc" class="text-slate-300 max-w-md text-xs md:text-sm mb-4">
+                    이끼 낀 바위와 거대 나무들이 길을 막아섭니다! <span class="text-cyan-400 font-bold">3단 스핀 점프</span>로 위험 가득한 원시림을 돌파하세요!
+                </p>
+                
+                <!-- 최종 성적 스탯창 (숨김 상태 기본) -->
+                <div id="endStats" class="hidden grid grid-cols-2 gap-3 max-w-sm w-full bg-slate-900 border border-slate-700 p-3 rounded-xl mb-4 text-left text-xs md:text-sm">
+                    <div>
+                        <span class="text-slate-400 text-[10px] md:text-xs block">최종 생존 시간</span>
+                        <span id="statTime" class="font-bold text-amber-400 text-sm md:text-base">0초</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 text-[10px] md:text-xs block">최종 점수</span>
+                        <span id="statScore" class="font-bold text-emerald-400 text-sm md:text-base">0점</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 text-[10px] md:text-xs block">돌파한 장애물</span>
+                        <span id="statObstacles" class="font-bold text-sky-400 text-sm md:text-base">0개</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 text-[10px] md:text-xs block">도달한 레벨</span>
+                        <span id="statLevel" class="font-bold text-purple-400 text-sm md:text-base">Lv.1</span>
+                    </div>
+                </div>
+
+                <!-- ✨ AI 코치 코너 (게임 오버 시 출력) -->
+                <div id="aiCoachBox" class="hidden w-full max-w-md bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-3 mb-4 text-left">
+                    <div class="flex items-center space-x-2 mb-1">
+                        <span class="text-lg">✨</span>
+                        <h4 class="font-bold text-xs md:text-sm text-emerald-300">AI 공룡 코치의 한마디 피드백</h4>
+                    </div>
+                    <p id="aiCoachText" class="text-[11px] md:text-xs text-slate-200 leading-relaxed italic">
+                        코치가 당신의 경기 내용을 면밀히 분석하고 있습니다... 🦖
+                    </p>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-2 w-full max-w-md justify-center">
+                    <button id="startBtn" class="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 text-white font-extrabold text-sm md:text-base rounded-xl shadow-lg transition-all cursor-pointer">
+                        게임 시작하기 🎮
+                    </button>
+                    <!-- AI 피드백 갱신 버튼 -->
+                    <button id="aiBtn" class="hidden px-5 py-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-cyan-300 font-bold text-xs md:text-sm rounded-xl border border-cyan-500/30 transition-all cursor-pointer">
+                        ✨ 코치 조언 한 번 더 받기
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 하단 조작 영역 -->
+    <div class="w-full mt-4 bg-slate-900/40 border border-slate-800 rounded-xl p-3 text-center text-xs md:text-sm text-slate-400">
+        <span class="hidden md:inline">⌨️ <strong>스페이스바(Space)</strong> 또는 <strong>마우스 클릭</strong> | 3단 공중 회전 점프로 더 오랫동안 생존하세요!</span>
+        <span class="md:hidden">📱 <strong>화면 아무 곳이나 연속 터치</strong>하여 3단 공중 점프를 구사하세요!</span>
+    </div>
+</div>
+
+<script>
+// 간단한 복고풍 사운드 이펙트 생성용 Web Audio API 설정
+class SoundEffects {
+    constructor() {
+        this.ctx = null;
+    }
+    init() {
+        if (!this.ctx) {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+    playJump() {
+        this.init();
+        if (!this.ctx) return;
+        let osc = this.ctx.createOscillator();
+        let gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(550, this.ctx.currentTime + 0.12);
+        
+        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.12);
+    }
+    playDoubleJump() {
+        this.init();
+        if (!this.ctx) return;
+        let osc = this.ctx.createOscillator();
+        let gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(280, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.18);
+        
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.18);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.18);
+    }
+    playTripleJump() {
+        this.init();
+        if (!this.ctx) return;
+        let osc = this.ctx.createOscillator();
+        let gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(450, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.25);
+        
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.25);
+    }
+    playScore() {
+        this.init();
+        if (!this.ctx) return;
+        let osc = this.ctx.createOscillator();
+        let gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, this.ctx.currentTime); // C5
+        osc.frequency.setValueAtTime(659.25, this.ctx.currentTime + 0.08); // E5
+        
+        gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.2);
+    }
+    playCrash() {
+        this.init();
+        if (!this.ctx) return;
+        let osc = this.ctx.createOscillator();
+        let gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(30, this.ctx.currentTime + 0.5);
+        
+        gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.5);
+    }
+}
+const sfx = new SoundEffects();
+</script>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// 디자인 해상도 비율 (16:9 고정 스케일용 가상 해상도 설정)
+const V_WIDTH = 1200;
+const V_HEIGHT = 675;
+
+// 해상도 조절 함수
+function resizeCanvas() {
+    canvas.width = V_WIDTH;
+    canvas.height = V_HEIGHT;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// --- 환경 물리 변수 및 상숫값 ---
+const GROUND_Y = 560; // 바닥 높이 위치
+const GRAVITY = 0.8;  // 중력 세기
+
+// --- 게임 상태 관리 ---
+let gameState = 'READY'; // READY, PLAYING, GAMEOVER
+let gameSpeed = 8.5;     
+let originalSpeed = 8.5;
+let score = 0;           // 실시간 총 점수
+let survivalTime = 0;    // 생존 프레임 누적 수치
+let survivedSecondsReal = 0; // 초 단위 타이머
+let currentLevel = 1;    // 현재 레벨
+let passedObstaclesCount = 0; // 극복한 장애물 수
+let totalFrameCount = 0; // 경과 프레임
+
+// 점수 알림 텍스트 효과 배열 (Floating Text)
+let floatTexts = [];
+
+// --- 은하수용 고정 별자리 배열 생성 ---
+const stars = [];
+for (let i = 0; i < 60; i++) {
+    stars.push({
+        x: Math.random() * V_WIDTH,
+        y: Math.random() * 320,
+        size: 0.8 + Math.random() * 1.8,
+        blinkSpeed: 0.02 + Math.random() * 0.04,
+        phase: Math.random() * Math.PI * 2
+    });
+}
+
+// --- 패럴랙스 배경 레이어 ---
+class BackgroundLayer {
+    constructor(imageType, speedFactor, heightOffset, baseHeight) {
+        this.imageType = imageType; // 'clouds', 'mountains', 'forest'
+        this.speedFactor = speedFactor;
+        this.heightOffset = heightOffset;
+        this.baseHeight = baseHeight;
+        this.x1 = 0;
+        this.x2 = V_WIDTH;
+    }
+
+    update(speed) {
+        if (gameState !== 'PLAYING') return;
+        let effectiveSpeed = speed * this.speedFactor;
+        this.x1 -= effectiveSpeed;
+        this.x2 -= effectiveSpeed;
+
+        if (this.x1 <= -V_WIDTH) this.x1 = V_WIDTH + this.x2 - effectiveSpeed;
+        if (this.x2 <= -V_WIDTH) this.x2 = V_WIDTH + this.x1 - effectiveSpeed;
+    }
+
+    draw(skyPhase) {
+        let fillStyle = '';
+        if (this.imageType === 'clouds') {
+            fillStyle = getInterpolatedColor('#f8fafc', '#fed7aa', '#1e293b', skyPhase);
+        } else if (this.imageType === 'mountains') {
+            fillStyle = getInterpolatedColor('#334155', '#475569', '#0f172a', skyPhase);
+        } else if (this.imageType === 'forest') {
+            fillStyle = getInterpolatedColor('#1e293b', '#2e1065', '#020617', skyPhase);
+        }
+
+        ctx.fillStyle = fillStyle;
+
+        if (this.imageType === 'clouds') {
+            this.drawCloudSlice(this.x1);
+            this.drawCloudSlice(this.x2);
+        } else if (this.imageType === 'mountains') {
+            this.drawMountainSlice(this.x1);
+            this.drawMountainSlice(this.x2);
+        } else if (this.imageType === 'forest') {
+            this.drawForestSlice(this.x1);
+            this.drawForestSlice(this.x2);
+        }
+    }
+
+    drawCloudSlice(offsetX) {
+        ctx.beginPath();
+        ctx.arc(offsetX + 150, this.heightOffset + 50, 40, 0, Math.PI * 2);
+        ctx.arc(offsetX + 200, this.heightOffset + 30, 50, 0, Math.PI * 2);
+        ctx.arc(offsetX + 260, this.heightOffset + 50, 40, 0, Math.PI * 2);
+        ctx.rect(offsetX + 150, this.heightOffset + 50, 110, 40);
+        ctx.arc(offsetX + 650, this.heightOffset + 80, 30, 0, Math.PI * 2);
+        ctx.arc(offsetX + 700, this.heightOffset + 60, 40, 0, Math.PI * 2);
+        ctx.arc(offsetX + 750, this.heightOffset + 80, 30, 0, Math.PI * 2);
+        ctx.rect(offsetX + 650, this.heightOffset + 80, 100, 30);
+        ctx.fill();
+    }
+
+    drawMountainSlice(offsetX) {
+        ctx.beginPath();
+        ctx.moveTo(offsetX, GROUND_Y);
+        ctx.lineTo(offsetX + 200, this.heightOffset);
+        ctx.lineTo(offsetX + 400, GROUND_Y);
+        ctx.lineTo(offsetX + 600, this.heightOffset + 100);
+        ctx.lineTo(offsetX + 850, GROUND_Y);
+        ctx.lineTo(offsetX + 1050, this.heightOffset - 50);
+        ctx.lineTo(offsetX + V_WIDTH, GROUND_Y);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    drawForestSlice(offsetX) {
+        for (let i = 0; i < V_WIDTH; i += 80) {
+            ctx.beginPath();
+            ctx.moveTo(offsetX + i, GROUND_Y);
+            ctx.lineTo(offsetX + i + 25, this.heightOffset);
+            ctx.lineTo(offsetX + i + 50, GROUND_Y);
+            ctx.closePath();
+            ctx.fill();
+        }
+    }
+}
+
+function getInterpolatedColor(color1, color2, color3, ratio) {
+    let c1, c2, localRatio;
+    if (ratio < 0.5) {
+        c1 = parseColor(color1);
+        c2 = parseColor(color2);
+        localRatio = ratio * 2;
+    } else {
+        c1 = parseColor(color2);
+        c2 = parseColor(color3);
+        localRatio = (ratio - 0.5) * 2;
+    }
+
+    const r = Math.round(c1.r + (c2.r - c1.r) * localRatio);
+    const g = Math.round(c1.g + (c2.g - c1.g) * localRatio);
+    const b = Math.round(c1.b + (c2.b - c1.b) * localRatio);
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
+function parseColor(hex) {
+    hex = hex.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return { r, g, b };
+}
+
+const layers = [
+    new BackgroundLayer('clouds', 0.1, 50, 100),       
+    new BackgroundLayer('mountains', 0.25, 280, 300),  
+    new BackgroundLayer('forest', 0.5, 450, 150)       
+];
+</script>
+
+<script>
+// --- 아주 귀여운 2D 모험가 공룡 캐릭터 (대형 반짝안경안구, 모험가 모자, 앙증맞은 가방 장착) ---
+class Dinosaur {
+    constructor() {
+        this.reset();
+    }
+
+    reset() {
+        this.width = 82; // 더욱 디테일한 표현을 위해 소폭 사이즈 업
+        this.height = 86;
+        this.x = 120;
+        this.y = GROUND_Y - this.height;
+        this.vy = 0;
+        
+        this.jumpForce1 = -16.5; 
+        this.jumpForce2 = -13.5; 
+        this.jumpForce3 = -12.5; 
+        
+        this.jumpCount = 0;      
+        this.isGrounded = true;
+        this.frame = 0;          
+        this.animSpeed = 0.15;
+        this.rotation = 0;       
+        this.jumpTrailEffect = 0; 
+    }
+
+    jump() {
+        if (this.jumpCount === 0 && this.isGrounded) {
+            this.vy = this.jumpForce1;
+            this.isGrounded = false;
+            this.jumpCount = 1;
+            sfx.playJump();
+            this.createDinoParticles('#f472b6', 10); // 귀여운 분홍 먼지 파티클
+        } else if (this.jumpCount === 1) {
+            this.vy = this.jumpForce2;
+            this.jumpCount = 2;
+            this.rotation = -Math.PI * 2; 
+            sfx.playDoubleJump();
+            this.createDinoParticles('#fbbf24', 12); // 노랑 스타 더스트
+        } else if (this.jumpCount === 2) {
+            this.vy = this.jumpForce3;
+            this.jumpCount = 3;
+            this.rotation = -Math.PI * 4; 
+            sfx.playTripleJump();
+            this.createDinoParticles('#22d3ee', 25); // 빛나는 오로라 바람 입자
+            this.jumpTrailEffect = 1.0; 
+        }
+    }
+
+    createDinoParticles(color, count) {
+        for (let i = 0; i < count; i++) {
+            particles.push(new Particle(this.x + this.width / 2, this.y + this.height - 15, color));
+        }
+    }
+
+    update() {
+        this.vy += GRAVITY;
+        this.y += this.vy;
+
+        if (this.y >= GROUND_Y - this.height) {
+            this.y = GROUND_Y - this.height;
+            this.vy = 0;
+            this.isGrounded = true;
+            this.jumpCount = 0;
+            this.rotation = 0;
+        }
+
+        if (this.jumpTrailEffect > 0) {
+            this.jumpTrailEffect -= 0.05;
+        }
+
+        if (this.isGrounded) {
+            this.frame += this.animSpeed * (gameSpeed / 7.5);
+        } else {
+            if (this.rotation < 0) {
+                this.rotation += 0.35; 
+                if (this.rotation > 0) this.rotation = 0;
+            }
+        }
+    }
+
+    draw() {
+        if (this.jumpTrailEffect > 0) {
+            ctx.save();
+            ctx.globalAlpha = this.jumpTrailEffect * 0.4;
+            ctx.translate(this.x + this.width / 2, this.y + this.height / 2 + 10);
+            ctx.rotate(this.rotation - 0.4);
+            this.drawDinoBody(true); 
+            ctx.restore();
+        }
+
+        ctx.save();
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+        ctx.translate(centerX, centerY);
+        if (this.rotation !== 0) {
+            ctx.rotate(this.rotation);
+        }
+
+        this.drawDinoBody(false);
+        ctx.restore();
+    }
+
+    drawDinoBody(isTrail = false) {
+        const ox = -this.width / 2;
+        const oy = -this.height / 2;
+
+        // 메인 컬러 팔레트 (잔상은 하늘색, 원래는 깜찍한 오렌지/옐로우빛 에메랄드)
+        const primaryColor = isTrail ? '#06b6d4' : '#10b981'; 
+        const bellyColor = isTrail ? '#e0f7fa' : '#ffe4e6'; // 귀여운 분홍빛 배
+        const scaleColor = isTrail ? '#0891b2' : '#f43f5e'; // 사랑스러운 체리색 등껍질/비늘
+
+        // 1. 통통하고 동그란 공룡 꼬리
+        ctx.fillStyle = primaryColor;
+        ctx.beginPath();
+        ctx.moveTo(ox + 15, oy + 50);
+        ctx.quadraticCurveTo(ox - 20, oy + 38, ox - 12, oy + 65);
+        ctx.quadraticCurveTo(ox + 15, oy + 65, ox + 25, oy + 55);
+        ctx.closePath();
+        ctx.fill();
+
+        // 꼬리 끝 귀여운 분홍 비늘 포인트
+        ctx.fillStyle = scaleColor;
+        ctx.beginPath();
+        ctx.arc(ox - 10, oy + 50, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. 등 뒤 동글동글 비늘
+        const spikes = [25, 37, 49];
+        spikes.forEach((sy) => {
+            ctx.fillStyle = scaleColor;
+            ctx.beginPath();
+            ctx.arc(ox + 12, oy + sy, 6, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // 3. 브라운 컬러의 앙증맞은 탐험가 아기 배낭 (가방끈 디테일 포함)
+        if (!isTrail) {
+            ctx.fillStyle = '#b45309'; // 갈색 배낭
+            ctx.beginPath();
+            ctx.roundRect(ox + 6, oy + 26, 12, 20, 3);
+            ctx.fill();
+            // 배낭 덮개 주머니
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(ox + 6, oy + 26, 12, 6);
+            // 배낭 버클 골드 스티치
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillRect(ox + 10, oy + 36, 4, 4);
+        }
+
+        // 4. 통통하고 안아주고 싶은 둥근 몸통
+        ctx.fillStyle = primaryColor;
+        ctx.beginPath();
+        ctx.roundRect(ox + 15, oy + 18, 45, 42, [18, 18, 10, 10]);
+        ctx.fill();
+
+        // 5. 모찌모찌하고 둥글넙적한 머리
+        ctx.beginPath();
+        ctx.roundRect(ox + 28, oy + 2, 46, 32, [14, 14, 8, 8]);
+        ctx.fill();
+
+        // 6. 포근한 연분홍색 말랑배
+        ctx.fillStyle = bellyColor;
+        ctx.beginPath();
+        ctx.roundRect(ox + 35, oy + 28, 22, 26, [4, 12, 6, 10]);
+        ctx.fill();
+
+        // 7. 울트라 초롱초롱 만화 속 왕눈이 눈망울 (초디테일 안구 광원 연출)
+        ctx.fillStyle = '#1e293b'; // 검은 눈동자 베이스
+        ctx.beginPath();
+        ctx.arc(ox + 58, oy + 14, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#ffffff'; // 하이라이트 1 (대형 광원)
+        ctx.beginPath();
+        ctx.arc(ox + 56, oy + 12, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#ffffff'; // 하이라이트 2 (소형 반짝임)
+        ctx.beginPath();
+        ctx.arc(ox + 60, oy + 17, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 수줍은 핑크빛 볼터치
+        if (!isTrail) {
+            ctx.fillStyle = '#f43f5e';
+            ctx.globalAlpha = 0.65;
+            ctx.beginPath();
+            ctx.arc(ox + 50, oy + 22, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+
+        // 8. 노란색 탐험가 헬멧/모자 (이마 위 헤드랜턴이 깜찍하게 빛남)
+        if (!isTrail) {
+            ctx.fillStyle = '#fbbf24'; // 모자 바디
+            ctx.beginPath();
+            ctx.arc(ox + 51, oy + 4, 18, Math.PI, 0);
+            ctx.fill();
+            // 챙
+            ctx.fillRect(ox + 30, oy + 2, 44, 4);
+            // 헤드랜턴 본체 및 광선 데코
+            ctx.fillStyle = '#e2e8f0';
+            ctx.fillRect(ox + 60, oy - 2, 8, 8);
+            ctx.fillStyle = '#fef08a'; // 손전등 불빛
+            ctx.beginPath();
+            ctx.arc(ox + 64, oy + 2, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 9. 앙증맞은 손 (두 손을 앞으로 모은 느낌)
+        ctx.fillStyle = isTrail ? '#0891b2' : '#047857';
+        ctx.beginPath();
+        ctx.roundRect(ox + 48, oy + 32, 10, 8, 3);
+        ctx.fill();
+
+        // 10. 숏다리 통통한 아기 발 (러닝 애니메이션에 맞춰 동적 회전/위치 변화)
+        ctx.fillStyle = isTrail ? '#0891b2' : '#047857';
+        const legPhase = Math.floor(this.frame) % 4;
+
+        if (!this.isGrounded) {
+            // 점프 시 꼬물거리며 접은 아기 발
+            ctx.fillRect(ox + 22, oy + 56, 12, 12);
+            ctx.fillRect(ox + 40, oy + 56, 12, 12);
+        } else {
+            if (legPhase === 0) {
+                ctx.roundRect(ox + 18, oy + 56, 12, 16, [4, 4, 2, 2]);
+                ctx.roundRect(ox + 38, oy + 56, 12, 10, [4, 4, 2, 2]);
+            } else if (legPhase === 1) {
+                ctx.roundRect(ox + 22, oy + 56, 12, 10, [4, 4, 2, 2]);
+                ctx.roundRect(ox + 36, oy + 56, 12, 16, [4, 4, 2, 2]);
+            } else if (legPhase === 2) {
+                ctx.roundRect(ox + 24, oy + 56, 12, 8, [4, 4, 2, 2]);
+                ctx.roundRect(ox + 34, oy + 56, 12, 16, [4, 4, 2, 2]);
+            } else {
+                ctx.roundRect(ox + 16, oy + 56, 12, 16, [4, 4, 2, 2]);
+                ctx.roundRect(ox + 40, oy + 56, 12, 10, [4, 4, 2, 2]);
+            }
+        }
+        ctx.fill();
+    }
+
+    getHitbox() {
+        return {
+            x: this.x + 15,
+            y: this.y + 6,
+            width: this.width - 24,
+            height: this.height - 12
+        };
+    }
+}
+
+const dino = new Dinosaur();
+</script>
+
+<script>
+// --- 장애물 클래스 구성 (이끼 낀 바위 & 거대 고대 나무로 변경) ---
+class Obstacle {
+    constructor(type, speed) {
+        this.type = type; // 'LOW' (바위) or 'HIGH' (고대 나무)
+        this.speed = speed;
+        this.markedForScore = false;
+
+        if (this.type === 'LOW') {
+            // 이끼 낀 둥글둥글한 바위 (장애물 크기 밸런싱)
+            this.width = 50 + Math.random() * 20;
+            this.height = 45 + Math.random() * 10;
+            this.x = V_WIDTH;
+            this.y = GROUND_Y - this.height;
+            this.pointValue = 10;
+        } else {
+            // 하늘 높이 솟은 거대 고대 나무 (기둥이 높고 울창함)
+            this.width = 60 + Math.random() * 20;
+            this.height = 115 + Math.random() * 30; 
+            this.x = V_WIDTH;
+            this.y = GROUND_Y - this.height;
+            this.pointValue = 20;
+        }
+    }
+
+    update(activeSpeed) {
+        this.x -= activeSpeed;
+    }
+
+    draw() {
+        ctx.save();
+        
+        if (this.type === 'LOW') {
+            // 1. 이끼 낀 숲속 바위 (Mossy Ancient Rock)
+            ctx.fillStyle = '#64748b'; // 기본 돌 색상 (슬레이트 그레이)
+            ctx.beginPath();
+            // 약간 울퉁불퉁하고 자연스러운 원형 보간 다각형 바위 드로잉
+            ctx.roundRect(this.x, this.y, this.width, this.height, [16, 16, 2, 2]);
+            ctx.fill();
+
+            // 바위 표면 명암 및 돌 갈라짐 금 간 선 디테일
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(this.x + this.width * 0.3, this.y + this.height * 0.2);
+            ctx.lineTo(this.x + this.width * 0.45, this.y + this.height * 0.6);
+            ctx.lineTo(this.x + this.width * 0.25, this.y + this.height * 0.8);
+            ctx.stroke();
+
+            // 바위 위에 수줍게 돋아난 폭신한 초록색 이끼 더미
+            ctx.fillStyle = '#15803d'; // 이끼 초록
+            ctx.beginPath();
+            ctx.ellipse(this.x + this.width * 0.5, this.y + 2, this.width * 0.3, 8, 0, 0, Math.PI * 2);
+            ctx.ellipse(this.x + this.width * 0.2, this.y + 6, this.width * 0.15, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 이끼 위에 핀 아주 조그맣고 깜찍한 노란 숲꽃 한 송이
+            ctx.fillStyle = '#fbbf24'; // 노랑 꽃잎
+            ctx.beginPath();
+            ctx.arc(this.x + this.width * 0.5, this.y - 8, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff'; // 하양 꽃잎 데코
+            ctx.beginPath();
+            ctx.arc(this.x + this.width * 0.5 - 3, this.y - 8, 2, 0, Math.PI * 2);
+            ctx.arc(this.x + this.width * 0.5 + 3, this.y - 8, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+        } else {
+            // 2. 우뚝 선 거대 고대 나무 (Ancient Forest Giant Tree)
+            // 갈색 든든한 몸체 둥치
+            ctx.fillStyle = '#78350f'; 
+            ctx.beginPath();
+            ctx.roundRect(this.x + this.width * 0.35, this.y + this.height * 0.25, this.width * 0.3, this.height * 0.75, [2, 2, 0, 0]);
+            ctx.fill();
+
+            // 나무 기둥에 난 꼬인 문양/구멍 디테일
+            ctx.fillStyle = '#451a03';
+            ctx.beginPath();
+            ctx.arc(this.x + this.width * 0.5, this.y + this.height * 0.6, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 울창하게 3단으로 겹쳐 뻗은 녹색 나뭇잎 레이어 (구름 형태)
+            const leafLevels = [
+                { cy: this.y + this.height * 0.15, cr: this.width * 0.45, color: '#166534' }, // 하단 숲 레이어
+                { cy: this.y + this.height * 0.05, cr: this.width * 0.42, color: '#15803d' }, // 중단 싱그러운 레이어
+                { cy: this.y - 10, cr: this.width * 0.35, color: '#22c55e' }                 // 최상단 연두빛 레이어
+            ];
+
+            leafLevels.forEach(level => {
+                ctx.fillStyle = level.color;
+                ctx.beginPath();
+                // 왼쪽 구름송이
+                ctx.arc(this.x + this.width * 0.25, level.cy, level.cr * 0.7, 0, Math.PI * 2);
+                // 가운데 큰 구름송이
+                ctx.arc(this.x + this.width * 0.5, level.cy - 5, level.cr * 0.9, 0, Math.PI * 2);
+                // 오른쪽 구름송이
+                ctx.arc(this.x + this.width * 0.75, level.cy, level.cr * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 나무 줄기에 매달린 탐스러운 고대 빛나는 과일 연출
+            ctx.fillStyle = '#f43f5e'; // 루비 열매
+            ctx.beginPath();
+            ctx.arc(this.x + this.width * 0.3, this.y + this.height * 0.35, 6, 0, Math.PI * 2);
+            ctx.fill();
+            // 빛 연출
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(this.x + this.width * 0.3 - 2, this.y + this.height * 0.35 - 2, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    getHitbox() {
+        return {
+            x: this.x + 8,
+            y: this.y + 4,
+            width: this.width - 16,
+            height: this.height - 8
+        };
+    }
+}
+
+let obstacles = [];
+let nextObstacleTimer = 0;
+let baseSpawnInterval = 85; 
+</script>
+
+<script>
+// --- 플로팅 및 특수 효과 개체 정의 ---
+class FloatingText {
+    constructor(text, x, y, color) {
+        this.text = text;
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.life = 60;
+    }
+    update() {
+        this.y -= 2.0;
+        this.life--;
+    }
+    draw() {
+        ctx.save();
+        ctx.fillStyle = this.color;
+        ctx.font = '900 24px Inter';
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = '#000000';
+        ctx.globalAlpha = this.life / 60;
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+    }
+}
+
+// 충돌 및 공중 폭발 이펙트 파티클
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 10;
+        this.vy = (Math.random() - 0.5) * 10 - 3;
+        this.radius = 3 + Math.random() * 5;
+        this.color = color;
+        this.life = 35;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.25;
+        this.life--;
+    }
+    draw() {
+        ctx.save();
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = this.life / 35;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+let particles = [];
+</script>
+
+<script>
+// AABB 충돌 알고리즘
+function checkCollision(rect1, rect2) {
+    return rect1.x < rect2.x + rect2.width &&
+           rect1.x + rect1.width > rect2.x &&
+           rect1.y < rect2.y + rect2.height &&
+           rect1.y + rect1.height > rect2.y;
+}
+
+// 게임오버 핸들러
+function triggerGameOver() {
+    gameState = 'GAMEOVER';
+    sfx.playCrash();
+
+    // 폭사 화려한 대폭발 연출
+    for (let i = 0; i < 50; i++) {
+        particles.push(new Particle(dino.x + 40, dino.y + 40, '#10b981'));
+        particles.push(new Particle(dino.x + 40, dino.y + 40, '#f43f5e'));
+        particles.push(new Particle(dino.x + 40, dino.y + 40, '#fbbf24'));
+    }
+
+    // 최종 스탯 대입
+    document.getElementById('statTime').innerText = `${survivedSecondsReal}초`;
+    document.getElementById('statScore').innerText = `${Math.floor(score)}점`;
+    document.getElementById('statObstacles').innerText = `${passedObstaclesCount}개`;
+    document.getElementById('statLevel').innerText = `Lv.${currentLevel}`;
+
+    document.getElementById('overlayTitle').innerText = "GAME OVER 💔";
+    document.getElementById('overlayTitle').className = "text-3xl md:text-5xl font-black text-rose-500 mb-2 animate-pulse";
+    document.getElementById('overlayDesc').innerText = "고대 정글 장벽에 부딪혔습니다! AI 공룡 코치의 조언을 받아 피지컬을 상승시켜보세요!";
+    document.getElementById('endStats').classList.remove('hidden');
+    document.getElementById('aiCoachBox').classList.remove('hidden');
+    document.getElementById('aiBtn').classList.remove('hidden');
+    document.getElementById('startBtn').innerText = "다시 도전하기 🔁";
+    document.getElementById('gameOverlay').classList.remove('pointer-events-none', 'opacity-0');
+
+    // ✨ AI 피드백 호출 실행
+    fetchAICoachFeedback();
+}
+
+// 극도로 타이트한 엇박자 장벽 무작위 생성 로직
+function spawnObstacleLogic() {
+    nextObstacleTimer--;
+    if (nextObstacleTimer <= 0) {
+        let rngType = Math.random() > 0.4 ? 'LOW' : 'HIGH';
+        
+        let newObs = new Obstacle(rngType, gameSpeed);
+        obstacles.push(newObs);
+
+        let baseGap = 430 / gameSpeed; 
+        
+        // 극단적이고 변화무쌍한 엇박자 템포 배율 (0.35배에서 2.4배까지)
+        let randomMultiplier = 0.35 + Math.random() * 2.05; 
+        let levelFactor = Math.max(0.55, 1 - (currentLevel - 1) * 0.08);
+        
+        nextObstacleTimer = Math.floor(baseGap * randomMultiplier * levelFactor);
+        
+        // 3단 점프로 불가능한 억까 상황 최소 방지 안전거리 보정
+        let absoluteMin = Math.max(22, 175 / gameSpeed); 
+        if (nextObstacleTimer < absoluteMin) {
+            nextObstacleTimer = absoluteMin;
+        }
+    }
+}
+</script>
+
+<script>
+// --- ✨ Gemini LLM AI 공룡 코치 피드백 구현 ---
+const apiKey = ""; // API Key는 환경에 의해 주입되므로 비워둠
+
+async function fetchAICoachFeedback() {
+    const feedbackBox = document.getElementById('aiCoachText');
+    feedbackBox.innerText = "✨ AI 공룡 코치가 비디오 분석 중... 🦖";
+
+    const systemPrompt = "너는 귀엽고 수다스러우며 장난꾸러기인 '전설의 티라노 게임 코치'야. 말투 끝에 '~르르', '~공룡!', '~다용'을 붙여서 아주 귀엽게 반말로 작성해줘. 사용자가 게임오버된 점수, 도달한 레벨, 생존 시간, 장애물 격파 수를 바탕으로 칭찬이나 따끔하지만 우스꽝스러운 격려와 피드백을 한 문장으로 제공해줘.";
+    const userPrompt = `이번 판 내 게임 성적이다용!
+- 점수: ${Math.floor(score)}점
+- 도달한 레벨: Lv.${currentLevel}
+- 살아남은 시간: ${survivedSecondsReal}초
+- 정복한 나무와 바위 장애물 개수: ${passedObstaclesCount}개
+
+이 스펙타클한 패배에 대해 격려와 생존 팁 한 줄을 아기 공룡스럽게 가르쳐줘!`;
+
+    const maxRetries = 5;
+    let delay = 1000;
+
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: userPrompt }] }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] }
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP Error Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const feedbackResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (feedbackResult) {
+                feedbackBox.innerText = feedbackResult.trim();
+                return;
+            } else {
+                throw new Error("Empty response parts");
+            }
+
+        } catch (err) {
+            if (i === maxRetries - 1) {
+                feedbackBox.innerText = "✨ 코치가 너무 흥분해서 말을 잇지 못한다용! 다음 판에 다시 물어보공룡! 🦖 (오류 발생)";
+                break;
+            }
+            // Exponential Backoff
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2;
+        }
+    }
+}
+
+// 코치 피드백 재요청 버튼 이벤트 바인딩
+document.getElementById('aiBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    fetchAICoachFeedback();
+});
+</script>
+
+<script>
+// 실시간 프레임 렌더러 루프
+function gameLoop() {
+    totalFrameCount++;
+
+    // 1. 낮과 밤 (Day & Night) 실시간 컬러 연동 계산
+    const DAY_CYCLE_FRAMES = 3600;
+    let cycleVal = (totalFrameCount % DAY_CYCLE_FRAMES) / DAY_CYCLE_FRAMES; 
+
+    let skyPhase = 0;
+    if (cycleVal < 0.25) {
+        skyPhase = 0;
+    } else if (cycleVal >= 0.25 && cycleVal < 0.45) {
+        skyPhase = (cycleVal - 0.25) / 0.20 * 0.5;
+    } else if (cycleVal >= 0.45 && cycleVal < 0.55) {
+        skyPhase = 0.5 + (cycleVal - 0.45) / 0.10 * 0.5;
+    } else if (cycleVal >= 0.55 && cycleVal < 0.85) {
+        skyPhase = 1.0;
+    } else {
+        skyPhase = 1.0 - (cycleVal - 0.85) / 0.15 * 1.0;
+    }
+
+    let skyGrad = ctx.createLinearGradient(0, 0, 0, V_HEIGHT);
+    
+    let skyTop = getInterpolatedColor('#0ea5e9', '#701a75', '#020617', skyPhase); 
+    let skyBottom = getInterpolatedColor('#bae6fd', '#fdba74', '#0f172a', skyPhase); 
+    
+    skyGrad.addColorStop(0, skyTop);
+    skyGrad.addColorStop(0.7, skyBottom);
+    skyGrad.addColorStop(1, '#1e293b'); 
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
+
+    if (skyPhase > 0.4) {
+        let starAlpha = (skyPhase - 0.4) / 0.6; 
+        stars.forEach(star => {
+            ctx.save();
+            ctx.globalAlpha = starAlpha * (0.3 + Math.abs(Math.sin(totalFrameCount * star.blinkSpeed + star.phase)) * 0.7);
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+    }
+
+    let celestialAngle = (cycleVal * Math.PI * 2) - Math.PI / 2; 
+    let cx = V_WIDTH / 2 + Math.cos(celestialAngle) * (V_WIDTH * 0.4);
+    let cy = V_HEIGHT * 0.6 + Math.sin(celestialAngle) * (V_HEIGHT * 0.4);
+
+    if (cycleVal >= 0.85 || cycleVal < 0.5) {
+        ctx.save();
+        let sunOpacity = 1.0;
+        if (cycleVal >= 0.35 && cycleVal < 0.5) sunOpacity = 1.0 - (cycleVal - 0.35) / 0.15; 
+        if (cycleVal >= 0.85 && cycleVal < 0.95) sunOpacity = (cycleVal - 0.85) / 0.10;
+        ctx.globalAlpha = sunOpacity;
+        
+        ctx.shadowBlur = 40;
+        ctx.shadowColor = 'rgba(251, 146, 60, 0.8)';
+        ctx.fillStyle = '#fdba74';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 35, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    if (cycleVal >= 0.4 && cycleVal < 0.9) {
+        ctx.save();
+        let moonOpacity = 0.0;
+        if (cycleVal >= 0.4 && cycleVal < 0.55) moonOpacity = (cycleVal - 0.4) / 0.15;
+        if (cycleVal >= 0.55 && cycleVal < 0.8) moonOpacity = 1.0;
+        if (cycleVal >= 0.8 && cycleVal < 0.9) moonOpacity = 1.0 - (cycleVal - 0.8) / 0.10;
+        ctx.globalAlpha = moonOpacity;
+
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = 'rgba(254, 240, 138, 0.6)';
+        ctx.fillStyle = '#fef08a';
+        
+        ctx.beginPath();
+        ctx.arc(cx, cy, 30, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = skyTop;
+        ctx.beginPath();
+        ctx.arc(cx + 10, cy - 5, 28, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // 2. 배경 패럴랙스 레이어 업데이트 및 그리기
+    layers.forEach(layer => {
+        layer.update(gameSpeed);
+        layer.draw(skyPhase);
+    });
+
+    // 지평선 바닥선 그리기
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y);
+    ctx.lineTo(V_WIDTH, GROUND_Y);
+    ctx.stroke();
+
+    // 움직이는 대지 패턴 그리기
+    ctx.fillStyle = '#334155';
+    for (let i = (totalFrameCount * -gameSpeed) % 80; i < V_WIDTH + 80; i += 80) {
+        ctx.fillRect(i, GROUND_Y + 15, 6, 6);
+        ctx.fillRect(i + 30, GROUND_Y + 45, 12, 4);
+    }
+
+    // 3. 인게임 상태 구동 연산
+    if (gameState === 'PLAYING') {
+        survivalTime += 0.16;
+        let prevSeconds = survivedSecondsReal;
+        survivedSecondsReal = Math.floor(survivalTime / 10);
+        
+        if (survivedSecondsReal > prevSeconds) {
+            score += 1;
+        }
+
+        let nextLvl = Math.floor(score / 150) + 1;
+        if (nextLvl > currentLevel) {
+            currentLevel = nextLvl;
+            gameSpeed = originalSpeed + (currentLevel - 1) * 2.0; 
+            floatTexts.push(new FloatingText(`LEVEL UP! LV.${currentLevel}`, dino.x + 50, dino.y - 40, '#a7f3d0'));
+            sfx.playScore();
+        }
+
+        spawnObstacleLogic();
+    }
+
+    dino.update();
+    dino.draw();
+
+    // 4. 장애물 루프 처리
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        let obs = obstacles[i];
+        if (gameState === 'PLAYING') {
+            obs.update(gameSpeed);
+        }
+        obs.draw();
+
+        if (gameState === 'PLAYING') {
+            if (checkCollision(dino.getHitbox(), obs.getHitbox())) {
+                triggerGameOver();
+            }
+        }
+
+        if (!obs.markedForScore && obs.x + obs.width < dino.x) {
+            obs.markedForScore = true;
+            passedObstaclesCount++;
+            score += obs.pointValue;
+            sfx.playScore();
+
+            const bonusText = `+${obs.pointValue}`;
+            const bonusColor = obs.type === 'LOW' ? '#34d399' : '#22d3ee'; 
+            floatTexts.push(new FloatingText(bonusText, dino.x + 35, dino.y - 20, bonusColor));
+
+            for (let p = 0; p < 8; p++) {
+                particles.push(new Particle(obs.x + obs.width, GROUND_Y - 20, bonusColor));
+            }
+        }
+
+        if (obs.x + obs.width < 0) {
+            obstacles.splice(i, 1);
+        }
+    }
+
+    // 5. 파티클 이펙트 업데이트 & 렌더링
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.update();
+        p.draw();
+        if (p.life <= 0) {
+            particles.splice(i, 1);
+        }
+    }
+
+    // 6. 점수 알림 플로팅 텍스트 렌더링
+    for (let i = floatTexts.length - 1; i >= 0; i--) {
+        let ft = floatTexts[i];
+        ft.update();
+        ft.draw();
+        if (ft.life <= 0) {
+            floatTexts.splice(i, 1);
+        }
+    }
+
+    document.getElementById('ui-level').innerText = currentLevel;
+    document.getElementById('ui-speed').innerText = (gameSpeed / originalSpeed).toFixed(1);
+    document.getElementById('ui-time').innerText = `${survivedSecondsReal}s`;
+    document.getElementById('ui-score').innerText = Math.floor(score);
+
+    requestAnimationFrame(gameLoop);
+}
+
+// 게임 재시작 함수
+function restartGame() {
+    sfx.init();
+    
+    obstacles = [];
+    particles = [];
+    floatTexts = [];
+    
+    gameState = 'PLAYING';
+    gameSpeed = originalSpeed;
+    score = 0;
+    survivalTime = 0;
+    survivedSecondsReal = 0;
+    currentLevel = 1;
+    passedObstaclesCount = 0;
+    nextObstacleTimer = baseSpawnInterval;
+
+    dino.reset();
+
+    document.getElementById('gameOverlay').classList.add('pointer-events-none', 'opacity-0');
+}
+</script>
+
+<script>
+// --- 키 바인딩 및 조작 수립 ---
+function handleJumpTrigger(e) {
+    if (gameState === 'PLAYING') {
+        dino.jump();
+        e.preventDefault();
+    }
+}
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+        if (gameState === 'PLAYING') {
+            dino.jump();
+            e.preventDefault();
+        } else if (gameState === 'READY' || gameState === 'GAMEOVER') {
+            restartGame();
+        }
+    }
+});
+
+canvas.addEventListener('mousedown', handleJumpTrigger);
+canvas.addEventListener('touchstart', handleJumpTrigger, { passive: false });
+
+const startBtn = document.getElementById('startBtn');
+startBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    restartGame();
+});
+
+window.onload = function() {
+    requestAnimationFrame(gameLoop);
+};
+</script>
+</body>
+</html>
